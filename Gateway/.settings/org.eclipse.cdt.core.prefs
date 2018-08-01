@@ -1,0 +1,12 @@
+#Tue Jul 31 15:15:06 PKT 2018
+eclipse.preferences.version=1
+environment/project/toolchain.config.hcs08.release.467320789/XBEEPATH/delimiter=;
+environment/project/toolchain.config.hcs08.release.467320789/XBEEPATH/operation=prepend
+environment/project/toolchain.config.hcs08.release.467320789/XBEEPATH/value=C\:\\Program Files (x86)\\Digi\\PXBee\\v1.6\\pxbee_api\\1.6.0
+environment/project/toolchain.config.hcs08.release.467320789/append=true
+environment/project/toolchain.config.hcs08.release.467320789/appendContributed=true
+environment/project/toolchain.config.hcs08.release.993508769/XBEEPATH/delimiter=;
+environment/project/toolchain.config.hcs08.release.993508769/XBEEPATH/operation=prepend
+environment/project/toolchain.config.hcs08.release.993508769/XBEEPATH/value=C\:\\Program Files (x86)\\Digi\\PXBee\\v1.6\\pxbee_api\\1.6.0
+environment/project/toolchain.config.hcs08.release.993508769/append=true
+environment/project/toolchain.config.hcs08.release.993508769/appendContributed=true
