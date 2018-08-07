@@ -1,2 +1,4 @@
 
 TrafficVisualisation/.idea
+*.xml
+*.iml
