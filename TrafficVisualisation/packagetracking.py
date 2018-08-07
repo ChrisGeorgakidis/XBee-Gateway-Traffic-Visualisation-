@@ -1,120 +1,112 @@
 from kivy.app import App
 from kivy.lang import Builder
+from kivy.properties import ObjectProperty
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.stacklayout import StackLayout
+from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.button import Button
 from kivy.clock import Clock
+from digi.xbee.models.status import NetworkDiscoveryStatus
+from digi.xbee.devices import XBeeDevice
+from digi.xbee.models.address import XBee64BitAddress
+from threading import Thread
+import time
 
-root = Builder.load_string('''
-<Package>:
-    BoxLayout:
-        orientation: 'horizontal'
-         
-        BoxLayout:
-            orientation: 'vertical'
-            size_hint: 0.3, 1
-        
-            canvas:
-                Color:
-                    rgb: .6, .6, .6
-                
-                Rectangle:
-                    pos: self.pos
-                    size: self.size
-            
-            BoxLayout:
-                orientation: 'vertical'
-                            
-                Label:
-                    text: 'Node List'
-                    size_hint: 1, 0.05
-                
-                BoxLayout:
-                    id: node_list
-                    orientation: 'vertical'
-                    padding: 10
-                    
-                    # Button:
-                    #     text: 'button1'
-                    # 
-                    # Button:
-                    #     text: 'button2'
-                    
-        BoxLayout:
-            canvas:
-                Color:
-                    rgb: 1, 1, 1
-                
-                Rectangle:
-                    pos: self.pos
-                    size: self.size
-            
-        
-            StackLayout:
-                id: package_pool
-                padding: 10
-                spacing: 15
-                orientation: 'lr-tb'
-            
-                # Button:
-                #     text: 'Device 1'
-                #     background_color: (0, 0.5, 1, 1)
-                #     size_hint: 0.5, 0.2
-                # 
-                # Button:
-                #     text: 'Device 2'
-                #     background_color: (0, 0.5, 1, 1)
-                #     size_hint: 0.5, 0.2
-                #     
-                # Button:
-                #     text: 'Device 3'
-                #     background_color: (0, 0.5, 1, 1)
-                #     size_hint: 0.5, 0.2
-                # 
-                # 
-                # Button:
-                #     text: 'Device 4'
-                #     background_color: (0, 0.5, 1, 1)
-                #     size_hint: 0.5, 0.2
-                # 
-                # 
-                # Button:
-                #     text: 'Device 5'
-                #     background_color: (0, 0.5, 1, 1)
-                #     size_hint: 0.5, 0.2
-                # 
-                #     
-                # Button:
-                #     text: 'Device 6'
-                #     background_color: (0, 0.5, 1, 1)
-                #     size_hint: 0.5, 0.2
-                # 
-                # Button:
-                #     text: 'Device 7'
-                #     background_color: (0, 0.5, 1, 1)
-                #     size_hint: 0.5, 0.2   
-''')
+root = Builder.load_file("packagetracking.kv")
 
 
 class Package(BoxLayout):
-    def update(self, dt):
-        node = Button(text='XBee Device', size_hint=(.5, .2), background_color=(0, .5, 1, 1))
-        self.ids.package_pool.add_widget(node)
-        node_name = Button(text='XBee Device')
-        self.ids.node_list.add_widget(node_name)
+    # def update(self, dt):
+    #     self.node = Button(text='XBee Device', size_hint=(.5, .2), background_color=(0, 0, 1, 1))
+    #     self.node.id = 'device'
+    #     self.ids.package_pool.add_widget(self.node)
+    #     self.node_name = Button(text='XBee Device', size_hint=(1, .1))
+    #     self.ids.transmitters_list.add_widget(self.node_name)
+
+    def show_message(self, transmitter, message, time):
+        node = Button()
+        node.id = transmitter
+
+        node_id = node.id
+        self.ids.node_id.text = "hey"
+        #for x in self.ids:
+            # if x == transmitter:
+            #     x.text = transmitter + "\nData: " + message + "\n Time: " + str(time)
+
+        x = node_id
+        print("hey")
 
 
 class PackageTrackingApp(App):
     def build(self):
-        root = Package()
-        Clock.schedule_interval(root.update, 1)
+        root.ids.gateway.text = "Gateway: '" + GATEWAY + "' (" + PORT + ")"
+        # Clock.schedule_interval(root.update, 1)
+        # root.update(1)
         return root
 
-    def  insert_node(self, address):
-        node = Button(text=address, size_hint=(.5, .2), background_color=(0, .5, 1, 1))
-        root.ids.package_pool.add_widget(node)
+
+def package_receiving():
+    counter = 5
+    while counter >= 0:
+        print("Message")
+        if counter%2 == 0:
+            remote_device = 'device1'
+        else:
+            remote_device = 'device2'
+        data = 'hey'
+        timestamp = counter
+        transmitters.append(remote_device)
+        root.show_message(remote_device, data, timestamp)
+        counter = counter - 1
+        time.sleep(1)
 
 
 if __name__ == '__main__':
-    PackageTrackingApp().run()
+    # print(" +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+")
+    # print(" | Establish a communication between a local and remote XBee devices | ")
+    # print(" +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+")
+
+    PORT = 'COM4'
+    GATEWAY = '1522'
+    BAUD_RATE = 115200
+    REMOTE_ADDRESS = ''
+    root = Package()
+    transmitters = []
+
+    # # Instantiate a local XBee device object #
+    # local_xbee = XBeeDevice(PORT, BAUD_RATE)
+    # local_xbee.open()
+    #
+    # # Get the node identifier of the device.
+    # node_id = local_xbee.get_node_id()
+
+    Thread(target=package_receiving).start()
+    Thread(target=PackageTrackingApp().run()).start()
+    #PackageTrackingApp().run()
+
+    # counter = 5
+    # while(counter >= 0):
+    #     print("Message")
+    #     remote_device = 'device'
+    #     data = 'hey'
+    #     timestamp = counter
+    #     transmitters.append(remote_device)
+    #     root.show_message(remote_device, data, timestamp)
+    #     counter = counter - 1
+        # # Read data from transmitters #
+        # xbee_message = local_xbee.read_data()
+        # if xbee_message is not None:
+        #     print("Message Received")
+        #     remote_device = xbee_message.remote_device
+        #     transmitters.append(remote_device)
+        #     data = xbee_message.data
+        #     timestamp = xbee_message.timestamp
+        #     counter = counter - 1
+
+    # # Close the XBee device connection #
+    # if local_xbee is not None and local_xbee.is_open():
+    #     local_xbee.close()
+
+
+
+
 
