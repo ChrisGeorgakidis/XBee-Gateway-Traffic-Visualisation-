@@ -143,7 +143,7 @@ ssize_t dht_init_communication()
                 delay += 1;
                 if (delay > 85)
                 {
-                    printf("TIMEOUT 1\n");
+                    // printf("TIMEOUT 1\n");
                     return -ETIMEDOUT;
                 }
                 else
@@ -173,7 +173,7 @@ ssize_t dht_init_communication()
                 delay += 1;
                 if (delay > 85)
                 {
-                    printf("TIMEOUT 2\n");
+                    // printf("TIMEOUT 2\n");
                     return -ETIMEDOUT;
                 }
                 else
@@ -202,36 +202,37 @@ ssize_t dht_read_data(uint8_t *rxbuf)
     // need 5200us = 5.2ms. This function takes data samples every   //
     // 10us. So by the end of the whole process we will have 520     //
     // samples.                                                      //
-    bool_t samples[520];
-    bool_t data[40];
+    uint8_t samples[480];
+    uint8_t data[40];
     uint8_t mask;
     uint8_t *rxbyte;
     uint8_t ones = 0;
 
     // Host collect all the samples of the communication //
     i = 0;
-    while (i < 520)
+    while (i < 480)
     {
         samples[i] = gpio_get(XPIN_1_WIRE_BUS);
         i++;
         sys_udelay(10);
     }
     
-    sys_watchdog_reset();
-
-    // Host decodes the samples to take the sensor's data //
-    for (j = 0; j < 40; j++)
-    {
-    	data[i] = 0;
-    }
     
+    // for (j = 0; j < 40; j++)
+    // {
+    //     sys_watchdog_reset();
+    //     data[j] = 0;
+    // }
+    memset(data, 0, sizeof(data));
     j = 0;
     i = 0;
 
-    while(i < 520)
+    // Host decodes the samples to take the sensor's data //
+
+    while(i < 480)
     {
         sys_watchdog_reset();
-        printf("sample[%d] = %d | j = %d\n", i, samples[i], j);
+        // printf("sample[%d] = %d | j = %d\n", i, samples[i], j);
 
         if (samples[i] == 1)
         {
@@ -242,6 +243,7 @@ ssize_t dht_read_data(uint8_t *rxbuf)
             // check if there is a sequence of '1' before the current cell //
             if (ones != 0)
             {
+                sys_watchdog_reset();
                 if (ones == 1 || ones == 2)
                 {
                     // I treat 1 or 2 consecutive '1' as '0' //
@@ -259,32 +261,32 @@ ssize_t dht_read_data(uint8_t *rxbuf)
         i++;
     }
 
-    printf("\n");
+    // // printf("\n");
 
-    for (j = 0; j < 40; j++)
-    {
-        printf("data[%d] = %d\n", j, data[j]);
-    }
+    // for (j = 0; j < 40; j++)
+    // {
+    //     // printf("data[%d] = %d\n", j, data[j]);
+    // }
 
-    for (i = 0; i < 5; i++)
-    {
-        rxbyte = rxbuf + i;
-        *rxbyte = 0;
-        mask = 128;
-        for (j = 0; j < 8; j++)
-        {
-            if (data[i * 8 + j])
-            {
-                *rxbyte |= mask;
-            }
-            mask >>= 1;
-        }
-    }
-     
      for (i = 0; i < 5; i++)
      {
-    	 printf("%d\n", rxbuf[i]);
+         rxbyte = rxbuf + i;
+         *rxbyte = 0;
+         mask = 128;
+         for (j = 0; j < 8; j++)
+         {
+             if (data[i * 8 + j])
+             {
+                 *rxbyte |= mask;
+             }
+             mask >>= 1;
+         }
      }
+     
+    // //  for (i = 0; i < 5; i++)
+    // //  {
+    // // 	 printf("%d\n", rxbuf[i]);
+    // //  }
 
     return 0;
 }
@@ -296,7 +298,7 @@ ssize_t dht_checksum(uint8_t *data, uint16_t *humidity, int16_t *temperature)
     uint8_t temperature_high = *(data + 2);
     uint8_t temperature_low = *(data + 3);
     uint8_t parity = *(data + 4);
-    uint8_t sum;
+    uint8_t sum = 0;
     uint16_t humidity_high_shifted;
     uint16_t temperature_high_shifted;
 

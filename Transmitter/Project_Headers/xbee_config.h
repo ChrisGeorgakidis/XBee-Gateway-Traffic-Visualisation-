@@ -15,12 +15,6 @@
 #define CONFIG_XBEE_S8
 #define CONFIG_XBEE_FLASH_LEN           32
 
-/* system0 component */
-#define SYS_CFG_CLK_48_MHz
-#define SYS_CFG_BUSCLK_SYSCLK_DIV2
-#define ENABLE_WD
-#define WD_CFG_LONG_TOUT
-
 /* special0 component */
 #define ENABLE_ASSOCIATION_LED_XPIN_28
 #define ENABLE_COMMISSIONING_XPIN_33
@@ -30,10 +24,8 @@
 
 /* rtc0 component */
 #define ENABLE_RTC
-
-/* network0 component */
-#define ENABLE_XBEE_HANDLE_TX_STATUS_FRAMES
-#define ENABLE_XBEE_HANDLE_ND_RESPONSE_FRAMES
+#define RTC_ENABLE_PERIODIC_TASK
+#define RTC_CFG_PERIODIC_TASK_PERIOD    2500
 
 /* uart0 component */
 #define ENABLE_UART
@@ -46,6 +38,21 @@
 #define UART_CFG_RX_BUF_LEN             32
 #define ENABLE_STDIO_PRINTF_SCANF       1
 
+/* Transmitter component */
+#define SYS_CFG_CLK_48_MHz
+#define SYS_CFG_BUSCLK_SYSCLK_DIV2
+#define ENABLE_WD
+#define WD_CFG_LONG_TOUT
+
+/* xbee_config0 component */
+#define XBEE_ATCMD_PARAM_ID             "10"
+#define XBEE_ATCMD_PARAM_NT             0x20
+#define XBEE_ATCMD_PARAM_NI             "TRANSMITTER"
+
+/* network0 component */
+#define ENABLE_XBEE_HANDLE_TX_STATUS_FRAMES
+#define ENABLE_XBEE_HANDLE_ND_RESPONSE_FRAMES
+
 /* XPIN_1_WIRE_BUS component */
 #define ENABLE_ONE_WIRE
 #define XPIN_1_WIRE_BUS                 XPIN_5
@@ -54,6 +61,14 @@
 #define GPIO_CFG_PULL_UP_EN_5           GPIO_CFG_PULL_UP_EN
 #define GPIO_CFG_SLEW_RATE_EN_5         GPIO_CFG_SLEW_RATE_EN
 #define GPIO_CFG_DRV_STR_5              GPIO_CFG_DRV_STR_LOW
+#define ENABLE_ONE_WIRE_STRONG_PULL_UP
+#define GPIO_CFG_DRV_STR_8              GPIO_CFG_DRV_STR_LOW
+#define XPIN_1_WIRE_STRONG_PULL_UP      XPIN_8
+#define ENABLE_GPIO_XPIN_8
+#define GPIO_CFG_DIR_8                  GPIO_CFG_OUTPUT
+#define GPIO_CFG_PULL_UP_EN_8           GPIO_CFG_PULL_UP_EN
+#define GPIO_CFG_SLEW_RATE_EN_8         GPIO_CFG_SLEW_RATE_EN
+#define GPIO_CFG_DRV_STR_8              GPIO_CFG_DRV_STR_LOW
 
 /* Used pins macros */
 #define XPIN_28_USED
@@ -64,17 +79,18 @@
 #define XPIN_4_USED
 #define XPIN_3_USED
 #define XPIN_5_USED
+#define XPIN_8_USED
 
 
 /* Components includes */
 #include <custom.h>
-#include <system.h>
 #include <rtc.h>
+#include <uart.h>
+#include <system.h>
 #include <pan_init.h>
 #include "xbee/discovery.h"
 #include "xbee/wpan.h"
 #include "xbee/atcmd.h"
-#include <uart.h>
 #include <one_wire.h>
 #include <gpios.h>
 
