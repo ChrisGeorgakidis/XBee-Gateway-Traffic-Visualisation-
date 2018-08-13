@@ -1,11 +1,19 @@
 from tkinter import *
 from tkinter import messagebox
-from threading import Thread
+from digi.xbee.devices import XBeeDevice
+from serial.tools import list_ports
+from digi.xbee.util import utils
 import time
-import functools, math
+import sys
+import functools
+import math
 
 
 # Global Variables
+PARAM_NODE_ID = "NI"
+PARAM_PAN_ID = "ID"
+PARAM_VALUE_NODE_ID = "GATEWAY"
+PARAM_VALUE_PAN_ID = utils.hex_string_to_bytes("10")
 prevSelectedIndex = -1
 devices = []
 counter = -1
@@ -107,47 +115,36 @@ class Application(Frame):
             devices[i].bind("<Button-1>", functools.partial(show_data_history, index=i))
 
 
-def insert_devices(event, canvas):
+def insert_devices(remote_device, data):
     global nOfTransmitters, devices, counter, node_list
     double = -1
-
-    counter = counter + 1
-    print(nOfTransmitters)
-    print(serial[counter])
 
     # Check if the transmitter is already in the node list
     if nOfTransmitters is not 0:
         for i in range(nOfTransmitters):
             # print(transmitters[i])
-            if serial[counter] == transmitters[i]:
-                print("Already in node list")
+            if remote_device == transmitters[i]:
+                # print("Transmitter already in node list")
                 double = i
 
     # Store device's name if it is not already in the node list
-
-    device_name = serial[counter]
-    data = data_serial[counter]
     if double is -1:
         nOfTransmitters = nOfTransmitters + 1
-        transmitters.append(device_name)
+        transmitters.append(remote_device)
         data_log.append(data)
-        transmitters_data[device_name] = [data]
+        transmitters_data[remote_device] = [data]
 
-        node_list.insert(END, device_name)
-        txt = device_name + "\n" + data
+        node_list.insert(END, remote_device)
+        txt = remote_device + "\n" + data
         label = Label(node_frame, text=txt, relief=RAISED, height=5, bg='gold')
         devices.append(label)
         devices[nOfTransmitters-1].grid(padx=10, pady=10)
         devices[nOfTransmitters-1].bind("<Button-1>", functools.partial(show_data_history, index=nOfTransmitters-1))
     else:
-        txt = device_name + "\n" + data
+        txt = remote_device + "\n" + data
         devices[double].configure(text=txt)
-        transmitters_data[device_name].append(data)
+        transmitters_data[remote_device].append(data)
         devices[double].bind("<Button-1>", functools.partial(show_data_history, index=double))
-
-    print(transmitters)
-    print(transmitters_data)
-    print(devices)
 
 
 def show_data_history(event, index):
@@ -158,14 +155,14 @@ def show_data_history(event, index):
 
 def resize_grid(event, canvas, node_frame):
     global devices, grid_width, grid_height
-    print(event.width, event.height)
+    # print(event.width, event.height)
 
     # Add the frame to the canvas
     if event.width > 348:
         x0 = event.width/2
     else:
         x0 = 0
-    print(x0)
+    # print(x0)
 
     grid_width = event.width
     grid_height = event.height
@@ -177,12 +174,11 @@ def resize_grid(event, canvas, node_frame):
             if (x * dim + y) < nOfTransmitters:
                 devices[x*dim+y].grid(row=x, column=y, padx=10, pady=10)
 
-    canvas.bind("<Button-3>", functools.partial(insert_devices, canvas=canvas))
+    # canvas.bind("<Button-3>", functools.partial(insert_devices, canvas=canvas))
     canvas.create_window((event.width/2, event.height/2), window=node_frame)
 
     # Tell the canvas how big of a region it should scroll
     canvas.config(scrollregion=node_frame.bbox("all"))
-
 
 
 def on_select(event):
@@ -198,28 +194,88 @@ def on_select(event):
     prevSelectedIndex = index
 
 
+def packages_received_callback(xbee_message):
+    remote_device = "0x" + str(xbee_message.remote_device.get_64bit_addr())
+    data = xbee_message.data.decode("utf8")
+    timestamp = time.ctime(xbee_message.timestamp)
+    print("Received data from " + str(remote_device) + ": " + data + "  [" + str(timestamp) + "]")
+    message = data + " [" + str(timestamp) + "]"
+    insert_devices(remote_device=remote_device, data=message)
+
+
+def ask_quit():
+    if messagebox.askokcancel("Quit", "Are you sure you want to quit?"):
+        if gateway is not None and gateway.is_open():
+            gateway.close()
+        root.destroy()
+
+
 if __name__ == '__main__':
-    PORT = 'COM4'
+    PORT = 'COM5'
     GATEWAY = '1522'
     BAUD_RATE = 115200
-    REMOTE_ADDRESS = ''
     nOfTransmitters = 0
-
-    serial = ['device 1', 'device 2', 'device 3', 'device 1', 'device 2', 'device 3', 'device 4', 'device 5']
-    data_serial = ['Humidity: 16%, Temperature: 32oC', 'Humidity: 26%, Temperature: 32oC',
-                   'Humidity: 36%, Temperature: 32oC', 'Humidity: 20%, Temperature: 32oC',
-                   'Humidity: 30%, Temperature: 32oC', 'Humidity: 40%, Temperature: 32oC',
-                   'Humidity: 46%, Temperature: 32oC', 'Humidity: 56%, Temperature: 32oC']
 
     transmitters = []
     data_log =[]
     transmitters_data = {}
 
-    root = Tk()
-    root.geometry("800x800")
-    root.resizable(1, 1)
-    root.title("Packet Traffic Visualisation")
-    app = Application(master=root)
+    # Look for COM port that might have an XBee connected
+    portfound = FALSE
+    ports = list(list_ports.comports())
 
-    app.mainloop()
+    for p in ports:
+        print(p)
+
+    if len(ports) > 1:
+        print("Found more than one XBee devices. Which one do you want to use as your gateway?")
+        print("Enter the port code (COMx, where x the corresponding number of the port)")
+        while portfound == FALSE:
+            user_port = input()
+            if user_port == "quit" or user_port == "exit":
+                sys.exit("Exit the Program")
+            for p in ports:
+                if user_port in p:
+                    if not portfound:
+                        portfound = TRUE
+                        PORT = p[0]
+                        print("Using " + p[0] + " as XBee COM port.")
+
+            if portfound == FALSE:
+                print("No serial port seems to have an XBee connected.")
+    elif len(ports) == 1:
+        for p in ports:
+            print("Found possible XBee on " + p[0])
+            if not portfound:
+                portfound = TRUE
+                PORT = p[0]
+                print("Using " + p[0] + " as XBee COM port.")
+
+    # If a port found then initialise and run the app
+    if portfound:
+        root = Tk()
+        root.geometry("800x800")
+        root.resizable(1, 1)
+        root.title("Packet Traffic Visualisation")
+        root.protocol("WM_DELETE_WINDOW", ask_quit)
+
+        gateway = XBeeDevice(PORT, BAUD_RATE)
+        gateway.open()
+        # Get the 64-bit address of the device.
+        GATEWAY = "0x" + str(gateway.get_64bit_addr())
+        # Set the ID & NI Parameter
+        gateway.set_parameter(PARAM_NODE_ID, bytearray(PARAM_VALUE_NODE_ID, 'utf8'))
+        gateway.set_parameter(PARAM_PAN_ID, PARAM_VALUE_PAN_ID)
+        # Get parameters.
+
+        print("Node ID:\t%s" % gateway.get_parameter(PARAM_NODE_ID).decode())
+
+        print("PAN ID:\t%s" % utils.hex_to_string(gateway.get_parameter(PARAM_PAN_ID)))
+        # Assign the data received callback to the gateway
+        gateway.add_data_received_callback(packages_received_callback)
+
+        app = Application(master=root)
+        app.mainloop()
+    else:
+        sys.exit("No serial port seems to have an XBee connected.")
 
