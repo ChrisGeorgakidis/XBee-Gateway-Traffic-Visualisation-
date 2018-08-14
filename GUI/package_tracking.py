@@ -8,11 +8,12 @@ import sys
 import functools
 import math
 
-
-# Global Variables
+# Gateway parameters
 PARAM_NODE_ID = "NI"
 PARAM_PAN_ID = "ID"
 PARAM_VALUE_NODE_ID = "GATEWAY"
+
+# Global Variables
 PARAM_VALUE_PAN_ID = utils.hex_string_to_bytes("10")
 prevSelectedIndex = -1
 devices = []
@@ -23,6 +24,8 @@ node_list = None
 node_frame = None
 
 
+# *** Application Class ***
+# The class of the main app
 class Application(Frame):
     def __init__(self, master=None):
         super().__init__(master)
@@ -36,7 +39,7 @@ class Application(Frame):
         m1.pack(fill=BOTH, expand=1)
 
         # Label for the gateway id and port
-        gateway_text = "Gateway: " + GATEWAY + " (" + PORT + ")"
+        gateway_text = "Gateway: " + GATEWAY + " (Port: " + PORT + ")"
         gateway_label = Label(m1, text=gateway_text, fg='black', font=("Helvetica", 16, "underline"))
         m1.add(gateway_label)
 
@@ -88,6 +91,7 @@ class Application(Frame):
         # Add a scrollbar that will scroll the canvas vertically
         vscrollbar = Scrollbar(pool_frame)
         vscrollbar.grid(column=1, row=0, sticky=N+S)
+
         # Link the scrollbar to the canvas
         canvas.config(yscrollcommand=vscrollbar.set)
         vscrollbar.config(command=canvas.yview)
@@ -96,12 +100,12 @@ class Application(Frame):
         # even though we later add it as a window to the canvas
         node_frame = Frame(canvas, bg='light yellow')
 
-        # IMPORTANT:
         node_frame.update_idletasks()  # REQUIRED: For f.bbox() below to work!
 
-        # Add a large grid of sample label widgets to fill the space
+        # Initialise the grid with the existing transmitters'
+        # data, if there are any.
         dim = int(math.ceil(math.sqrt(nOfTransmitters)))
-        # devices = []
+
         for x in range(dim):
             for y in range(dim):
                 if (x * dim + y) < nOfTransmitters:
@@ -115,6 +119,10 @@ class Application(Frame):
             devices[i].bind("<Button-1>", functools.partial(show_data_history, index=i))
 
 
+# *** insert_devices ***
+# This function inserts the information of each transmitter
+# that have sent data and also updates the corresponding data
+# structures and the GUI.
 def insert_devices(remote_device, data):
     global nOfTransmitters, devices, counter, node_list
     double = -1
@@ -147,22 +155,27 @@ def insert_devices(remote_device, data):
         devices[double].bind("<Button-1>", functools.partial(show_data_history, index=double))
 
 
+# *** show_data_history ***
+# When the users clicks on a transmitter's rectangle, then
+# a message box is created and shows the log of the data that
+# the corresponding transmitter has sent.
 def show_data_history(event, index):
     transmitters_history = transmitters_data.get(transmitters[index])
     data = "\n".join(str(x) for x in transmitters_history)
     messagebox.showinfo(transmitters[index], "Data Log:\n" + data)
 
 
+# *** resize_grid ***
+# This is the handler which resizes the grid when the user
+# resizes the app's window.
 def resize_grid(event, canvas, node_frame):
     global devices, grid_width, grid_height
-    # print(event.width, event.height)
 
     # Add the frame to the canvas
     if event.width > 348:
         x0 = event.width/2
     else:
         x0 = 0
-    # print(x0)
 
     grid_width = event.width
     grid_height = event.height
@@ -181,6 +194,13 @@ def resize_grid(event, canvas, node_frame):
     canvas.config(scrollregion=node_frame.bbox("all"))
 
 
+# *** on_select ***
+# This is the handler that is triggered when the user is
+# selecting an element of the listbox. This listbox contains
+# the unique 64-bit addresses of the transmitters that have
+# already sent data. When the users selects one of these
+# addresses then the corresponding rectangle of the grid
+# is highlighted.
 def on_select(event):
     global prevSelectedIndex, devices
     w = event.widget
@@ -194,6 +214,12 @@ def on_select(event):
     prevSelectedIndex = index
 
 
+# *** packages_received_callback ***
+# This is the handler that is triggered each time the
+# gateway is receiving a new data from a transmitter.
+# When the gateway is receiving new data from a transmitter,
+# it gets the information of the message that was sent and
+# insert them into the current data structures.
 def packages_received_callback(xbee_message):
     remote_device = "0x" + str(xbee_message.remote_device.get_64bit_addr())
     data = xbee_message.data.decode("utf8")
@@ -203,6 +229,10 @@ def packages_received_callback(xbee_message):
     insert_devices(remote_device=remote_device, data=message)
 
 
+# *** ask_quit ***
+# Verifies that the user is sure he wants to quit the app.
+# This is needed in order to close the connection with the
+# gateway xbee device.
 def ask_quit():
     if messagebox.askokcancel("Quit", "Are you sure you want to quit?"):
         if gateway is not None and gateway.is_open():
@@ -211,8 +241,9 @@ def ask_quit():
 
 
 if __name__ == '__main__':
-    PORT = 'COM5'
-    GATEWAY = '1522'
+    PORT = ''
+    GATEWAY = ''
+
     BAUD_RATE = 115200
     nOfTransmitters = 0
 
@@ -229,9 +260,8 @@ if __name__ == '__main__':
 
     if len(ports) > 1:
         print("Found more than one XBee devices. Which one do you want to use as your gateway?")
-        print("Enter the port code (COMx, where x the corresponding number of the port)")
         while portfound == FALSE:
-            user_port = input()
+            user_port = input("Enter the port code (COMx, where x the corresponding number of the port): ")
             if user_port == "quit" or user_port == "exit":
                 sys.exit("Exit the Program")
             for p in ports:
@@ -258,6 +288,9 @@ if __name__ == '__main__':
         root.resizable(1, 1)
         root.title("Packet Traffic Visualisation")
         root.protocol("WM_DELETE_WINDOW", ask_quit)
+
+        # Asks the user to enter the baudrate
+        BAUD_RATE = input("Enter the baudrate of the device: ")
 
         gateway = XBeeDevice(PORT, BAUD_RATE)
         gateway.open()
