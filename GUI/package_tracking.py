@@ -11,10 +11,18 @@ import math
 # Gateway parameters
 PARAM_NODE_ID = "NI"
 PARAM_PAN_ID = "ID"
+PARAM_SM = "SM"
+PARAM_SO = "SO"
+PARAM_SP = "SP"
+PARAM_ST = "ST"
 PARAM_VALUE_NODE_ID = "GATEWAY"
 
 # Global Variables
 PARAM_VALUE_PAN_ID = utils.hex_string_to_bytes("10")
+PARAM_VALUE_SM = utils.int_to_bytes(7, 1)
+PARAM_VALUE_SO = utils.int_to_bytes(1, 1)
+PARAM_VALUE_SP = utils.int_to_bytes(2000, 2)
+PARAM_VALUE_ST = utils.int_to_bytes(5000, 2)
 prevSelectedIndex = -1
 devices = []
 counter = -1
@@ -294,18 +302,30 @@ if __name__ == '__main__':
         BAUD_RATE = input("Enter the baudrate of the device: ")
 
         gateway = XBeeDevice(PORT, BAUD_RATE)
+        if gateway.is_open():
+            gateway.close()
         gateway.open()
         # Get the 64-bit address of the device.
         GATEWAY = "0x" + str(gateway.get_64bit_addr())
+
         # Set the ID & NI Parameter
         gateway.set_parameter(PARAM_NODE_ID, bytearray(PARAM_VALUE_NODE_ID, 'utf8'))
         gateway.set_parameter(PARAM_PAN_ID, PARAM_VALUE_PAN_ID)
+        gateway.set_parameter(PARAM_SM, PARAM_VALUE_SM)
+        gateway.set_parameter(PARAM_SO, PARAM_VALUE_SO)
+        gateway.set_parameter(PARAM_SP, PARAM_VALUE_SP)
+        gateway.set_parameter(PARAM_ST, PARAM_VALUE_ST)
+
+
         # Get parameters.
-
         print("Node ID:\t%s" % gateway.get_parameter(PARAM_NODE_ID).decode())
-
+        print("Power management mode(SM):\t%s" % utils.bytes_to_int(gateway.get_parameter(PARAM_SM)))
+        print("Sleep Options(SO):\t%s" % utils.bytes_to_int(gateway.get_parameter(PARAM_SO)))
+        print("Sleep Time(SP):\t%s" % utils.bytes_to_int(gateway.get_parameter(PARAM_SP)))
+        print("Wake Time(ST):\t%s" % utils.bytes_to_int(gateway.get_parameter(PARAM_ST)))
         print("PAN ID:\t%s" % utils.hex_to_string(gateway.get_parameter(PARAM_PAN_ID)))
-        # Assign the data received callback to the gateway
+
+       # Assign the data received callback to the gateway
         gateway.add_data_received_callback(packages_received_callback)
 
         app = Application(master=root)

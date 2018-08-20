@@ -66,7 +66,7 @@
  *   XPIN23 = Do not Connect
  *   XPIN24 = <<UNUSED>>
  *   XPIN25 = <<UNUSED>>
- *   XPIN26 = <<UNUSED>>
+ *   XPIN26 = power_management0 [On Sleep Pin]
  *   XPIN27 = VCC REF
  *   XPIN28 = special0 [Association Pin]
  *   XPIN29 = <<UNUSED>>
@@ -98,6 +98,8 @@ uint16_t counter;
 
 /* Timer signaled a new sample has to be taken */
 bool_t app_request_send = FALSE;
+/* Signal when radio is awaked */
+bool_t radio_ready = TRUE;
 
 // *** EVENT HANDLERS *** //
 
@@ -252,6 +254,10 @@ void main(void)
 			{
 				printf("GATEWAY not discovered yet!");
 			}
+			else if (!radio_ready)
+			{
+				printf("Radio slept! waiting to wake up\n");
+			}
 			else
 			{
 				if (data_generation() == FALSE)
@@ -265,7 +271,30 @@ void main(void)
 				}
 			}
 		}
-		
+
+		/* Enter CPU in low power while radio is in low power */
+		if (pm_get_radio_mode() == PM_MODE_STOP)
+		{
+			radio_ready = FALSE;
+
+			printf("Going to sleep...\n");
+			delay_ticks(2); /* This is for avoiding writing garbage on the UART */
+
+			pm_set_cpu_mode(PM_MODE_STOP, WAIT_INFINITE); /* Start sleeping */
+			/* When CPU wakes-up, it continues executing from here */
+
+			/* Possible wake sources in this example: Radio and RTC */
+
+			delay_ticks(2); /* This is for avoiding writing garbage on the UART */
+			printf("CPU Awaked\n");
+		}
+
+		/* Signal when radio is ready */
+		if (!radio_ready && (pm_get_radio_mode() == PM_MODE_RUN))
+		{
+			radio_ready = TRUE;
+			printf("Radio Awaked\n");
+		}
 
 		sys_watchdog_reset();
 		sys_xbee_tick();

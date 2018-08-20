@@ -15,6 +15,12 @@
 #define CONFIG_XBEE_S8
 #define CONFIG_XBEE_FLASH_LEN           32
 
+/* Transmitter component */
+#define SYS_CFG_CLK_48_MHz
+#define SYS_CFG_BUSCLK_SYSCLK_DIV2
+#define ENABLE_WD
+#define WD_CFG_LONG_TOUT
+
 /* special0 component */
 #define ENABLE_ASSOCIATION_LED_XPIN_28
 #define ENABLE_COMMISSIONING_XPIN_33
@@ -47,11 +53,16 @@
 #define XBEE_ATCMD_PARAM_NT             0x20
 #define XBEE_ATCMD_PARAM_NI             "TRANSMITTER_COUNTER"
 
-/* Transmitter component */
-#define SYS_CFG_CLK_48_MHz
-#define SYS_CFG_BUSCLK_SYSCLK_DIV2
-#define ENABLE_WD
-#define WD_CFG_LONG_TOUT
+/* power_management0 component */
+#define ENABLE_POWER_MANAGEMENT
+#define ENABLE_ON_SLEEP_XPIN_26
+#define XBEE_ATCMD_PARAM_SM             8
+#define XBEE_ATCMD_PARAM_SO             0
+#define XBEE_ATCMD_PARAM_SP             (20000/10) /* User enters SP in mS */
+#define XBEE_ATCMD_PARAM_ST             5000
+#define POWER_MANAGEMENT_KEEP_UPTIME    1
+#define POWER_MANAGEMENT_ENABLE_LVD     0
+#define ENABLE_WAKEUP_FROM_UART         0
 
 /* Used pins macros */
 #define XPIN_28_USED
@@ -61,16 +72,18 @@
 #define XPIN_7_USED
 #define XPIN_4_USED
 #define XPIN_3_USED
+#define XPIN_26_USED
 
 
 /* Components includes */
 #include <custom.h>
+#include <system.h>
 #include <rtc.h>
 #include <pan_init.h>
 #include "xbee/discovery.h"
 #include "xbee/wpan.h"
 #include "xbee/atcmd.h"
 #include <uart.h>
-#include <system.h>
+#include <pm.h>
 
 #endif /* __XBEE_CONFIG_H_ */
