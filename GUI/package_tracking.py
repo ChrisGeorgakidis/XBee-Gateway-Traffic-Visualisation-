@@ -135,7 +135,9 @@ def insert_devices(remote_device, data):
                 # print("Transmitter already in node list")
                 double = i
 
-    # Store device's name if it is not already in the node list
+    # Store device's name if it is not already in the node list.
+    # If it is already in the list, then just append the new data
+    # that it sent.
     if double is -1:
         nOfTransmitters = nOfTransmitters + 1
         transmitters.append(remote_device)
@@ -156,7 +158,7 @@ def insert_devices(remote_device, data):
 
 
 # *** show_data_history ***
-# When the users clicks on a transmitter's rectangle, then
+# When the user clicks on a transmitter's rectangle, then
 # a message box is created and shows the log of the data that
 # the corresponding transmitter has sent.
 def show_data_history(event, index):
@@ -187,7 +189,6 @@ def resize_grid(event, canvas, node_frame):
             if (x * dim + y) < nOfTransmitters:
                 devices[x*dim+y].grid(row=x, column=y, padx=10, pady=10)
 
-    # canvas.bind("<Button-3>", functools.partial(insert_devices, canvas=canvas))
     canvas.create_window((event.width/2, event.height/2), window=node_frame)
 
     # Tell the canvas how big of a region it should scroll
@@ -219,7 +220,7 @@ def on_select(event):
 # gateway is receiving a new data from a transmitter.
 # When the gateway is receiving new data from a transmitter,
 # it gets the information of the message that was sent and
-# insert them into the current data structures.
+# inserts them into the current data structures.
 def packages_received_callback(xbee_message):
     remote_device = "0x" + str(xbee_message.remote_device.get_64bit_addr())
     data = xbee_message.data.decode("utf8")
