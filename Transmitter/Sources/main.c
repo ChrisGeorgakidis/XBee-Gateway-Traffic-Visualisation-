@@ -66,7 +66,7 @@
  *   XPIN23 = Do not Connect
  *   XPIN24 = <<UNUSED>>
  *   XPIN25 = <<UNUSED>>
- *   XPIN26 = <<UNUSED>>
+ *   XPIN26 = power_management0 [On Sleep Pin]
  *   XPIN27 = VCC REF
  *   XPIN28 = special0 [Association Pin]
  *   XPIN29 = <<UNUSED>>
@@ -100,6 +100,8 @@ char humid_buf[sizeof(uint16_t) + 1];
 char temp_buf[sizeof(int16_t) + 1];
 /* Timer signaled a new sample has to be taken */
 bool_t app_request_send = FALSE;
+/* Signal when radio is awaked */
+bool_t radio_ready = TRUE;
 
 // *** EVENT HANDLERS *** //
 
@@ -256,52 +258,6 @@ void data_transmission()
 
 	humidity = 0;
 	temperature = 0;
-
-	// printf("Sending humidity: 0x%x\n", humidity);
-
-	// sys_watchdog_reset();
-	// // Store the data into the transmission buffer //
-	// *(uint16_t *)humid_buf = humidity;
-	// // Store the transmission data into the envelope //
-	// wpan_envelope_create(&envelope, &xdev.wpan_dev, &gateway_ieeeaddr, WPAN_NET_ADDR_UNDEFINED);
-	// envelope.payload = humid_buf;
-	// envelope.length = 2;
-
-	// successful_transmission = xbee_transparent_serial(&envelope);
-
-	// // Check if the data has been sent successfully. If there was a problem  //
-	// // sending the data, then try again to resend it. The program stops      //
-	// // trying sending the data after 10 tries and continues with the next    //
-	// // data.																 //
-	// sys_watchdog_reset();
-	// if (successful_transmission == 0) // Humidity has been sent successfully //
-	// {
-	// 	printf("-> -> Humidity sent!\n");
-	// 	printf("Sending temperature: 0x%x\n", temperature);
-
-	// 	// Store the data into the transmission buffer //
-	// 	*(uint16_t *)temp_buf = temperature;
-	// 	// Store the transmission data into the envelope //
-	// 	envelope.payload = temp_buf;
-	// 	envelope.length = 2;
-
-	// 	successful_transmission = xbee_transparent_serial(&envelope);
-
-	// 	// Check if the data has been sent  successfully. If there was a problem //
-	// 	// sending the data, then try again to resend it. The program stops      //
-	// 	// trying sending the data after 10 tries and continues with the next    //
-	// 	// data.																 //
-	// 	if (successful_transmission == 0) // Data sent successfully //
-	// 	{
-	// 		printf("-> -> Temperature sent!\n");
-	// 	}
-	// }
-	// else
-	// {
-	// 	printf("Humidity not sent!");
-	// }
-	
-	// return;
 }
 
 void main(void)
@@ -330,6 +286,11 @@ void main(void)
 			{
 				printf("GATEWAY not discovered yet!");
 			}
+			else if (radio_ready == FALSE)
+			{
+				printf("Radio slept: Waiting to wake up\n");
+
+			}
 			else
 			{
 				if (data_generation() == FALSE)
@@ -344,6 +305,26 @@ void main(void)
 			}
 		}
 		
+		// Enter CPU in low power while radio is in low power //
+		if (pm_get_radio_mode() == PM_MODE_STOP)
+		{
+			radio_ready = FALSE;
+
+			printf("Going to sleep...\n");
+			delay_ticks(2); // This is for avoiding writing garbage on the UART //
+
+			pm_set_cpu_mode(PM_MODE_STOP, WAIT_INFINITE); // Start sleeping //
+			
+			delay_ticks(2); // This is for avoiding writing garbage on the UART //
+			printf("CPU Awaked\n");
+		}
+
+		// Signal when radio is ready //
+		if (!radio_ready && (pm_get_radio_mode() == PM_MODE_RUN))
+		{
+			radio_ready = TRUE;
+			printf("Radio Awaked\n");
+		}
 
 		sys_watchdog_reset();
 		sys_xbee_tick();

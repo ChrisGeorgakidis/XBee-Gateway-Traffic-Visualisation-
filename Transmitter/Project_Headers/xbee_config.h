@@ -15,6 +15,12 @@
 #define CONFIG_XBEE_S8
 #define CONFIG_XBEE_FLASH_LEN           32
 
+/* Transmitter component */
+#define SYS_CFG_CLK_48_MHz
+#define SYS_CFG_BUSCLK_SYSCLK_DIV2
+#define ENABLE_WD
+#define WD_CFG_LONG_TOUT
+
 /* special0 component */
 #define ENABLE_ASSOCIATION_LED_XPIN_28
 #define ENABLE_COMMISSIONING_XPIN_33
@@ -27,6 +33,10 @@
 #define RTC_ENABLE_PERIODIC_TASK
 #define RTC_CFG_PERIODIC_TASK_PERIOD    2500
 
+/* network0 component */
+#define ENABLE_XBEE_HANDLE_TX_STATUS_FRAMES
+#define ENABLE_XBEE_HANDLE_ND_RESPONSE_FRAMES
+
 /* uart0 component */
 #define ENABLE_UART
 #define UART_CFG_MODE_2W                1
@@ -38,20 +48,10 @@
 #define UART_CFG_RX_BUF_LEN             32
 #define ENABLE_STDIO_PRINTF_SCANF       1
 
-/* Transmitter component */
-#define SYS_CFG_CLK_48_MHz
-#define SYS_CFG_BUSCLK_SYSCLK_DIV2
-#define ENABLE_WD
-#define WD_CFG_LONG_TOUT
-
 /* xbee_config0 component */
 #define XBEE_ATCMD_PARAM_ID             "10"
 #define XBEE_ATCMD_PARAM_NT             0x20
 #define XBEE_ATCMD_PARAM_NI             "TRANSMITTER"
-
-/* network0 component */
-#define ENABLE_XBEE_HANDLE_TX_STATUS_FRAMES
-#define ENABLE_XBEE_HANDLE_ND_RESPONSE_FRAMES
 
 /* XPIN_1_WIRE_BUS component */
 #define ENABLE_ONE_WIRE
@@ -70,6 +70,17 @@
 #define GPIO_CFG_SLEW_RATE_EN_8         GPIO_CFG_SLEW_RATE_EN
 #define GPIO_CFG_DRV_STR_8              GPIO_CFG_DRV_STR_LOW
 
+/* power_management0 component */
+#define ENABLE_POWER_MANAGEMENT
+#define ENABLE_ON_SLEEP_XPIN_26
+#define XBEE_ATCMD_PARAM_SM             8
+#define XBEE_ATCMD_PARAM_SO             0
+#define XBEE_ATCMD_PARAM_SP             (20000/10) /* User enters SP in mS */
+#define XBEE_ATCMD_PARAM_ST             10000
+#define POWER_MANAGEMENT_KEEP_UPTIME    1
+#define POWER_MANAGEMENT_ENABLE_LVD     0
+#define ENABLE_WAKEUP_FROM_UART         0
+
 /* Used pins macros */
 #define XPIN_28_USED
 #define XPIN_33_USED
@@ -80,18 +91,20 @@
 #define XPIN_3_USED
 #define XPIN_5_USED
 #define XPIN_8_USED
+#define XPIN_26_USED
 
 
 /* Components includes */
 #include <custom.h>
-#include <rtc.h>
-#include <uart.h>
 #include <system.h>
+#include <rtc.h>
 #include <pan_init.h>
 #include "xbee/discovery.h"
 #include "xbee/wpan.h"
 #include "xbee/atcmd.h"
+#include <uart.h>
 #include <one_wire.h>
 #include <gpios.h>
+#include <pm.h>
 
 #endif /* __XBEE_CONFIG_H_ */
