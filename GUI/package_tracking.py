@@ -31,6 +31,8 @@ grid_width = 0
 grid_height = 0
 node_list = None
 node_frame = None
+sleep_lable = None
+awake_label = None
 
 
 # *** Application Class ***
@@ -42,7 +44,8 @@ class Application(Frame):
         self.create_widgets()
 
     def create_widgets(self):
-        global node_list, node_frame
+        global node_list, node_frame, sleep_label, awake_label
+
         # Divide the root window vertically
         m1 = PanedWindow(width=500, height=500, orient=VERTICAL)
         m1.pack(fill=BOTH, expand=1)
@@ -55,22 +58,34 @@ class Application(Frame):
         f1 = Frame(m1)
         m1.add(f1)
 
-        txt = "Network Sleeping Time: "
+        txt = "Network Sleeping Time: " + str(utils.bytes_to_int(gateway.get_parameter("OS")))
         sleep_label = Label(f1, text=txt, fg='black', font=("Helvetica", 16, "underline"))
         sleep_label.pack(side=LEFT, fill=Y)
 
-        e1 = Entry(f1, bd=2)
-        e1.pack(side=RIGHT, fill=BOTH)
+        f11 = Frame(f1)
+        f11.pack(side=RIGHT, fill=BOTH)
+
+        e1 = Entry(f11, bd=2)
+        e1.pack(side=LEFT, fill=BOTH)
+
+        update_sleep_period_button = Button(f11, text="Update Sleep Time", command=update_sleep_time)
+        update_sleep_period_button.pack(side=RIGHT, fill=BOTH)
 
         f2 = Frame(m1)
         m1.add(f2)
 
-        txt = "Network Awake Time: "
+        txt = "Network Awake Time: " + str(utils.bytes_to_int(gateway.get_parameter("OW")))
         awake_label = Label(f2, text=txt, fg='black', font=("Helvetica", 16, "underline"))
         awake_label.pack(side=LEFT)
 
-        e2 = Entry(f2, bd=2)
-        e2.pack(side=RIGHT, fill=BOTH)
+        f22 = Frame(f2)
+        f22.pack(side=RIGHT, fill=BOTH)
+
+        e2 = Entry(f22, bd=2)
+        e2.pack(side=LEFT, fill=BOTH)
+
+        update_awake_time_button = Button(f22, text="Update Wake Time", command=update_wake_time)
+        update_awake_time_button.pack(side=RIGHT, fill=BOTH)
 
         # Now divide the remainder of m1 horizontally
         m2 = PanedWindow(m1, orient=HORIZONTAL)
@@ -146,6 +161,14 @@ class Application(Frame):
         node_list.bind("<<ListboxSelect>>", functools.partial(on_select))
         for i in range(nOfTransmitters):
             devices[i].bind("<Button-1>", functools.partial(show_data_history, index=i))
+
+
+def update_sleep_time():
+    pass
+
+
+def update_wake_time():
+    pass
 
 
 # *** insert_devices ***
