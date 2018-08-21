@@ -1,6 +1,7 @@
 from tkinter import *
 from tkinter import messagebox
-from digi.xbee.devices import XBeeDevice
+from digi.xbee.devices import XBeeDevice, RemoteXBeeDevice
+from digi.xbee.models.address import XBee64BitAddress
 from serial.tools import list_ports
 from digi.xbee.util import utils
 import time
@@ -50,6 +51,26 @@ class Application(Frame):
         gateway_text = "Gateway: " + GATEWAY + " (Port: " + PORT + ")"
         gateway_label = Label(m1, text=gateway_text, fg='black', font=("Helvetica", 16, "underline"))
         m1.add(gateway_label)
+
+        f1 = Frame(m1)
+        m1.add(f1)
+
+        txt = "Network Sleeping Time: "
+        sleep_label = Label(f1, text=txt, fg='black', font=("Helvetica", 16, "underline"))
+        sleep_label.pack(side=LEFT, fill=Y)
+
+        e1 = Entry(f1, bd=2)
+        e1.pack(side=RIGHT, fill=BOTH)
+
+        f2 = Frame(m1)
+        m1.add(f2)
+
+        txt = "Network Awake Time: "
+        awake_label = Label(f2, text=txt, fg='black', font=("Helvetica", 16, "underline"))
+        awake_label.pack(side=LEFT)
+
+        e2 = Entry(f2, bd=2)
+        e2.pack(side=RIGHT, fill=BOTH)
 
         # Now divide the remainder of m1 horizontally
         m2 = PanedWindow(m1, orient=HORIZONTAL)
@@ -138,17 +159,17 @@ def insert_devices(remote_device, data):
     # Check if the transmitter is already in the node list
     if nOfTransmitters is not 0:
         for i in range(nOfTransmitters):
-            # print(transmitters[i])
             if remote_device == transmitters[i]:
-                # print("Transmitter already in node list")
                 double = i
 
     # Store device's name if it is not already in the node list.
     # If it is already in the list, then just append the new data
     # that it sent.
     if double is -1:
+
         nOfTransmitters = nOfTransmitters + 1
         transmitters.append(remote_device)
+
         data_log.append(data)
         transmitters_data[remote_device] = [data]
 
@@ -163,6 +184,16 @@ def insert_devices(remote_device, data):
         devices[double].configure(text=txt)
         transmitters_data[remote_device].append(data)
         devices[double].bind("<Button-1>", functools.partial(show_data_history, index=double))
+
+
+# *** quit_transmitter_window ***
+# This function does the appropriate actions in order to close the
+# transmitter info window
+def quit_transmitter_window():
+    # Destroy the transmitter info window
+    global transmitter_info_window
+
+    transmitter_info_window.destroy()
 
 
 # *** show_data_history ***
@@ -243,6 +274,7 @@ def packages_received_callback(xbee_message):
 # This is needed in order to close the connection with the
 # gateway xbee device.
 def ask_quit():
+    # Ask user if he is sure he wants to quit
     if messagebox.askokcancel("Quit", "Are you sure you want to quit?"):
         if gateway is not None and gateway.is_open():
             gateway.close()
@@ -316,7 +348,6 @@ if __name__ == '__main__':
         gateway.set_parameter(PARAM_SP, PARAM_VALUE_SP)
         gateway.set_parameter(PARAM_ST, PARAM_VALUE_ST)
 
-
         # Get parameters.
         print("Node ID:\t%s" % gateway.get_parameter(PARAM_NODE_ID).decode())
         print("Power management mode(SM):\t%s" % utils.bytes_to_int(gateway.get_parameter(PARAM_SM)))
@@ -325,7 +356,7 @@ if __name__ == '__main__':
         print("Wake Time(ST):\t%s" % utils.bytes_to_int(gateway.get_parameter(PARAM_ST)))
         print("PAN ID:\t%s" % utils.hex_to_string(gateway.get_parameter(PARAM_PAN_ID)))
 
-       # Assign the data received callback to the gateway
+        # Assign the data received callback to the gateway
         gateway.add_data_received_callback(packages_received_callback)
 
         app = Application(master=root)
