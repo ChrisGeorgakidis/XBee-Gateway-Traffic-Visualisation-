@@ -1,5 +1,6 @@
 from tkinter import *
 from tkinter import messagebox
+from decimal import Decimal
 from digi.xbee.devices import XBeeDevice, RemoteXBeeDevice
 from digi.xbee.models.address import XBee64BitAddress
 from serial.tools import list_ports
@@ -16,6 +17,8 @@ PARAM_SM = "SM"
 PARAM_SO = "SO"
 PARAM_SP = "SP"
 PARAM_ST = "ST"
+PARAM_OS = "OS"
+PARAM_OW = "OW"
 PARAM_VALUE_NODE_ID = "GATEWAY"
 
 # Global Variables
@@ -31,8 +34,10 @@ grid_width = 0
 grid_height = 0
 node_list = None
 node_frame = None
-sleep_lable = None
+sleep_label = None
+sleep_entry = None
 awake_label = None
+awake_entry = None
 
 
 # *** Application Class ***
@@ -44,7 +49,7 @@ class Application(Frame):
         self.create_widgets()
 
     def create_widgets(self):
-        global node_list, node_frame, sleep_label, awake_label
+        global node_list, node_frame, sleep_label, sleep_entry, awake_label, awake_entry
 
         # Divide the root window vertically
         m1 = PanedWindow(width=500, height=500, orient=VERTICAL)
@@ -58,15 +63,15 @@ class Application(Frame):
         f1 = Frame(m1)
         m1.add(f1)
 
-        txt = "Network Sleeping Time: " + str(utils.bytes_to_int(gateway.get_parameter("OS")))
+        txt = "Network Sleeping Time: " + str(utils.bytes_to_int(gateway.get_parameter("OS")) * 10 / 1000) + " sec"
         sleep_label = Label(f1, text=txt, fg='black', font=("Helvetica", 16, "underline"))
         sleep_label.pack(side=LEFT, fill=Y)
 
         f11 = Frame(f1)
         f11.pack(side=RIGHT, fill=BOTH)
 
-        e1 = Entry(f11, bd=2)
-        e1.pack(side=LEFT, fill=BOTH)
+        sleep_entry = Entry(f11, bd=2)
+        sleep_entry.pack(side=LEFT, fill=BOTH)
 
         update_sleep_period_button = Button(f11, text="Update Sleep Time", command=update_sleep_time)
         update_sleep_period_button.pack(side=RIGHT, fill=BOTH)
@@ -74,15 +79,15 @@ class Application(Frame):
         f2 = Frame(m1)
         m1.add(f2)
 
-        txt = "Network Awake Time: " + str(utils.bytes_to_int(gateway.get_parameter("OW")))
+        txt = "Network Awake Time: " + str(utils.bytes_to_int(gateway.get_parameter("OW")) / 1000) + " sec"
         awake_label = Label(f2, text=txt, fg='black', font=("Helvetica", 16, "underline"))
         awake_label.pack(side=LEFT)
 
         f22 = Frame(f2)
         f22.pack(side=RIGHT, fill=BOTH)
 
-        e2 = Entry(f22, bd=2)
-        e2.pack(side=LEFT, fill=BOTH)
+        awake_entry = Entry(f22, bd=2)
+        awake_entry.pack(side=LEFT, fill=BOTH)
 
         update_awake_time_button = Button(f22, text="Update Wake Time", command=update_wake_time)
         update_awake_time_button.pack(side=RIGHT, fill=BOTH)
@@ -164,11 +169,38 @@ class Application(Frame):
 
 
 def update_sleep_time():
-    pass
+    global sleep_label, sleep_entry
+
+    if len(sleep_entry.get()) > 0:
+        new_sleep_time = float(sleep_entry.get())
+        # print(new_sleep_time)
+        sleep_entry.delete(0, END)
+
+        txt = "Network Sleeping Time: " + str(new_sleep_time) + " sec"
+        sleep_label.configure(text=txt)
+
+        ms_time = int(new_sleep_time * 1000)
+
+        gateway.set_parameter(PARAM_SP, utils.int_to_bytes(ms_time, 8))
+
+        # print("Sleep Time(SP):\t%s" % utils.bytes_to_int(gateway.get_parameter(PARAM_SP)))
+        # print("Operating Sleeping Time (OS):\t%s" % utils.bytes_to_int(gateway.get_parameter(PARAM_OS)))
 
 
 def update_wake_time():
-    pass
+    global awake_label, awake_entry
+
+    if len(awake_entry.get()) > 0:
+        new_awake_time = float(awake_entry.get())
+        # print(new_sleep_time)
+        awake_entry.delete(0, END)
+
+        txt = "Network Awaking Time: " + str(new_awake_time) + " sec"
+        awake_label.configure(text=txt)
+
+        ms_time = int(new_awake_time * 1000)
+
+        gateway.set_parameter(PARAM_ST, utils.int_to_bytes(ms_time, 8))
 
 
 # *** insert_devices ***
@@ -347,14 +379,14 @@ if __name__ == '__main__':
 
     # If a port found then initialise and run the app
     if portfound:
+        # Asks the user to enter the baudrate
+        BAUD_RATE = input("Enter the baudrate of the device: ")
+
         root = Tk()
         root.geometry("800x800")
         root.resizable(1, 1)
         root.title("Packet Traffic Visualisation")
         root.protocol("WM_DELETE_WINDOW", ask_quit)
-
-        # Asks the user to enter the baudrate
-        BAUD_RATE = input("Enter the baudrate of the device: ")
 
         gateway = XBeeDevice(PORT, BAUD_RATE)
         if gateway.is_open():
