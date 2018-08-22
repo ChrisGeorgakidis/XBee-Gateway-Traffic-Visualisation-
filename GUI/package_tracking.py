@@ -1,10 +1,10 @@
 from tkinter import *
 from tkinter import messagebox
-from decimal import Decimal
-from digi.xbee.devices import XBeeDevice, RemoteXBeeDevice
-from digi.xbee.models.address import XBee64BitAddress
+from digi.xbee.serial import XBeeSerialPort
+from digi.xbee.devices import XBeeDevice
 from serial.tools import list_ports
 from digi.xbee.util import utils
+import serial
 import time
 import sys
 import functools
@@ -38,6 +38,17 @@ sleep_label = None
 sleep_entry = None
 awake_label = None
 awake_entry = None
+sleep_wake_label = None
+prev_status = 0
+status_timer = 0
+sleep_time = 0
+awake_time = 0
+
+baudrates = {'1200', '2400', '4800', '9600', '19200', '38400', '57600', '115200', '230400', '460800', '921600'}
+
+
+def bitconv(n):
+    return [int(digit) for digit in bin(n)[2:]]  # [2:] to chop off the "0b" part
 
 
 # *** Application Class ***
@@ -47,24 +58,70 @@ class Application(Frame):
         super().__init__(master)
         self.pack()
         self.create_widgets()
+        self.update_time()
+        self.master.mainloop()
+
+    # *** update_time ***
+    def update_time(self):
+        global status_timer, prev_status, devices
+
+        status_timer = status_timer + 1
+
+        sleep_status = bitconv(utils.bytes_to_int(gateway.get_parameter("SS")))
+        print(sleep_status)
+
+        status = sleep_status[len(sleep_status) - 1]
+        print(status)
+
+        # check if network is asleep or awake
+        if status == 1:   # asleep
+            if status != prev_status:
+                status_timer = 0
+                if len(devices) > 0:
+                    for rect in devices:
+                        rect.config(bg='green3')
+            sleep_wake_time_txt = "Network Sleep in " + str(utils.bytes_to_int(gateway.get_parameter(PARAM_OW)) / 1000 - status_timer) + " sec"
+        else:
+            if status != prev_status:
+                status_timer = 0
+                if len(devices) > 0:
+                    for rect in devices:
+                        rect.config(bg='red3')
+            sleep_wake_time_txt = "Network Awake in " + str(utils.bytes_to_int(gateway.get_parameter(PARAM_OS)) * 10 / 1000 - status_timer) + " sec"
+
+        sleep_wake_label.configure(text=sleep_wake_time_txt)
+        prev_status = status
+
+        txt = "Network Sleeping Time: " + str(utils.bytes_to_int(gateway.get_parameter(PARAM_OS)) * 10 / 1000) + " sec"
+        sleep_label.configure(text=txt)
+        txt = "Network Awaking Time: " + str(utils.bytes_to_int(gateway.get_parameter(PARAM_OW)) / 1000) + " sec"
+        awake_label.configure(text=txt)
+
+        self.master.after(1000, self.update_time)
 
     def create_widgets(self):
-        global node_list, node_frame, sleep_label, sleep_entry, awake_label, awake_entry
+        global node_list, node_frame, sleep_label, sleep_entry, awake_label, awake_entry, sleep_wake_label
 
         # Divide the root window vertically
         m1 = PanedWindow(width=500, height=500, orient=VERTICAL)
         m1.pack(fill=BOTH, expand=1)
 
+        f0 = Frame(m1, bd=20)
+        m1.add(f0)
+
         # Label for the gateway id and port
         gateway_text = "Gateway: " + GATEWAY + " (Port: " + PORT + ")"
-        gateway_label = Label(m1, text=gateway_text, fg='black', font=("Helvetica", 16, "underline"))
-        m1.add(gateway_label)
+        gateway_label = Label(f0, text=gateway_text, fg='black', font=("Helvetica", 16, "underline"))
+        gateway_label.pack(side=LEFT, fill=BOTH)
 
-        f1 = Frame(m1)
+        sleep_wake_label = Label(f0, fg='black', font=("Helvetica", 16, "bold"))
+        sleep_wake_label.pack(side=RIGHT, fill=BOTH)
+
+        f1 = Frame(m1, bd=10)
         m1.add(f1)
 
-        txt = "Network Sleeping Time: " + str(utils.bytes_to_int(gateway.get_parameter("OS")) * 10 / 1000) + " sec"
-        sleep_label = Label(f1, text=txt, fg='black', font=("Helvetica", 16, "underline"))
+        # txt = "Network Sleeping Time: " + str(utils.bytes_to_int(gateway.get_parameter("OS")) * 10 / 1000) + " sec"
+        sleep_label = Label(f1, fg='black', font=("Helvetica", 16, "underline"))
         sleep_label.pack(side=LEFT, fill=Y)
 
         f11 = Frame(f1)
@@ -76,11 +133,11 @@ class Application(Frame):
         update_sleep_period_button = Button(f11, text="Update Sleep Time", command=update_sleep_time)
         update_sleep_period_button.pack(side=RIGHT, fill=BOTH)
 
-        f2 = Frame(m1)
+        f2 = Frame(m1, bd=10)
         m1.add(f2)
 
-        txt = "Network Awake Time: " + str(utils.bytes_to_int(gateway.get_parameter("OW")) / 1000) + " sec"
-        awake_label = Label(f2, text=txt, fg='black', font=("Helvetica", 16, "underline"))
+        # txt = "Network Awake Time: " + str(utils.bytes_to_int(gateway.get_parameter("OW")) / 1000) + " sec"
+        awake_label = Label(f2, fg='black', font=("Helvetica", 16, "underline"))
         awake_label.pack(side=LEFT)
 
         f22 = Frame(f2)
@@ -169,38 +226,34 @@ class Application(Frame):
 
 
 def update_sleep_time():
-    global sleep_label, sleep_entry
+    global sleep_label, sleep_entry, sleep_time, status_timer
 
     if len(sleep_entry.get()) > 0:
         new_sleep_time = float(sleep_entry.get())
-        # print(new_sleep_time)
         sleep_entry.delete(0, END)
 
-        txt = "Network Sleeping Time: " + str(new_sleep_time) + " sec"
-        sleep_label.configure(text=txt)
+        print(new_sleep_time)
 
-        ms_time = int(new_sleep_time * 1000)
+        ms_time = int((new_sleep_time / 10) * 1000)
 
-        gateway.set_parameter(PARAM_SP, utils.int_to_bytes(ms_time, 8))
+        gateway.set_parameter(PARAM_SP, utils.hex_string_to_bytes(hex(ms_time)))
+        print(utils.bytes_to_int(gateway.get_parameter(PARAM_OS)))
 
-        # print("Sleep Time(SP):\t%s" % utils.bytes_to_int(gateway.get_parameter(PARAM_SP)))
-        # print("Operating Sleeping Time (OS):\t%s" % utils.bytes_to_int(gateway.get_parameter(PARAM_OS)))
+        sleep_time = new_sleep_time
 
 
 def update_wake_time():
-    global awake_label, awake_entry
+    global awake_label, awake_entry, awake_time
 
     if len(awake_entry.get()) > 0:
         new_awake_time = float(awake_entry.get())
-        # print(new_sleep_time)
         awake_entry.delete(0, END)
-
-        txt = "Network Awaking Time: " + str(new_awake_time) + " sec"
-        awake_label.configure(text=txt)
 
         ms_time = int(new_awake_time * 1000)
 
-        gateway.set_parameter(PARAM_ST, utils.int_to_bytes(ms_time, 8))
+        gateway.set_parameter(PARAM_ST, utils.hex_string_to_bytes(hex(ms_time)))
+
+        awake_time = new_awake_time
 
 
 # *** insert_devices ***
@@ -380,8 +433,11 @@ if __name__ == '__main__':
     # If a port found then initialise and run the app
     if portfound:
         # Asks the user to enter the baudrate
-        BAUD_RATE = input("Enter the baudrate of the device: ")
-
+        while TRUE:
+            if input("Enter the baudrate of the device: ") not in baudrates:
+                print("Not supported baudrate. Please try again")
+            else:
+                break
         root = Tk()
         root.geometry("800x800")
         root.resizable(1, 1)
@@ -389,9 +445,13 @@ if __name__ == '__main__':
         root.protocol("WM_DELETE_WINDOW", ask_quit)
 
         gateway = XBeeDevice(PORT, BAUD_RATE)
+
         if gateway.is_open():
             gateway.close()
         gateway.open()
+
+        ser = gateway.serial_port
+
         # Get the 64-bit address of the device.
         GATEWAY = "0x" + str(gateway.get_64bit_addr())
 
@@ -400,8 +460,11 @@ if __name__ == '__main__':
         gateway.set_parameter(PARAM_PAN_ID, PARAM_VALUE_PAN_ID)
         gateway.set_parameter(PARAM_SM, PARAM_VALUE_SM)
         gateway.set_parameter(PARAM_SO, PARAM_VALUE_SO)
-        gateway.set_parameter(PARAM_SP, PARAM_VALUE_SP)
-        gateway.set_parameter(PARAM_ST, PARAM_VALUE_ST)
+        gateway.set_parameter(PARAM_SP, utils.hex_string_to_bytes(hex(2000)))
+        gateway.set_parameter(PARAM_ST,utils.hex_string_to_bytes(hex(10000)))
+
+        sleep_time = utils.bytes_to_int(gateway.get_parameter(PARAM_SP)) * 10 / 1000
+        awake_time = utils.bytes_to_int(gateway.get_parameter(PARAM_ST)) / 1000
 
         # Get parameters.
         print("Node ID:\t%s" % gateway.get_parameter(PARAM_NODE_ID).decode())
@@ -409,13 +472,14 @@ if __name__ == '__main__':
         print("Sleep Options(SO):\t%s" % utils.bytes_to_int(gateway.get_parameter(PARAM_SO)))
         print("Sleep Time(SP):\t%s" % utils.bytes_to_int(gateway.get_parameter(PARAM_SP)))
         print("Wake Time(ST):\t%s" % utils.bytes_to_int(gateway.get_parameter(PARAM_ST)))
+        print("Operating Sleep Time(OS):\t%s" % utils.bytes_to_int(gateway.get_parameter(PARAM_OS)))
+        print("Operating Wake Time(OW):\t%s" % utils.bytes_to_int(gateway.get_parameter(PARAM_OW)))
         print("PAN ID:\t%s" % utils.hex_to_string(gateway.get_parameter(PARAM_PAN_ID)))
 
         # Assign the data received callback to the gateway
         gateway.add_data_received_callback(packages_received_callback)
 
         app = Application(master=root)
-        app.mainloop()
     else:
         sys.exit("No serial port seems to have an XBee connected.")
 
