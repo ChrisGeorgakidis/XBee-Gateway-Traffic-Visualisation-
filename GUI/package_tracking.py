@@ -1,5 +1,7 @@
 from tkinter import *
 from tkinter import messagebox
+
+from digi.xbee.exception import TimeoutException
 from digi.xbee.serial import XBeeSerialPort
 from digi.xbee.devices import XBeeDevice
 from serial.tools import list_ports
@@ -43,8 +45,27 @@ prev_status = 0
 status_timer = 0
 sleep_time = 0
 awake_time = 0
+OS_time = 0
+OW_time = 0
+previously_changed = 0 # 0 = no change, 1 = changed sleep time, 2 = changed wake time, 3 = changed both
 
 baudrates = {'1200', '2400', '4800', '9600', '19200', '38400', '57600', '115200', '230400', '460800', '921600'}
+
+# My colors
+# BACKGROUND_COLOR = '#0a463c'
+# NODELIST_COLOR = '#fceec7'
+# PACKETPOOL_COLOR = '#b6d2dd'
+# ASLEEP_DEVICE_COLOR = '#e45149'
+# AWAKE_DEVICE_COLOR = '#259086'
+# NEW_DEVICE_COLOR = '#e9cb31'
+
+BACKGROUND_COLOR = '#dd9166'
+NODELIST_COLOR = '#e2ddc7'
+PACKETPOOL_COLOR = '#958f80'
+ASLEEP_DEVICE_COLOR = '#54595a'
+AWAKE_DEVICE_COLOR = '#cd9d8d'
+NEW_DEVICE_COLOR = '#f2be54'
+SCROLLBARS_COLOR = '#ded7d1'
 
 
 def bitconv(n):
@@ -63,39 +84,64 @@ class Application(Frame):
 
     # *** update_time ***
     def update_time(self):
-        global status_timer, prev_status, devices
+        global status_timer, prev_status, devices, OS_time, OW_time, previously_changed
 
         status_timer = status_timer + 1
 
-        sleep_status = bitconv(utils.bytes_to_int(gateway.get_parameter("SS")))
-        print(sleep_status)
+        try:
+            ST = utils.bytes_to_int(gateway.get_parameter("OS")) * 10 / 1000
+        except TimeoutException:
+            ST = OS_time
 
-        status = sleep_status[len(sleep_status) - 1]
-        print(status)
+        try:
+            AT = utils.bytes_to_int(gateway.get_parameter("OW")) / 1000
+        except TimeoutException:
+            AT = OW_time
 
-        # check if network is asleep or awake
-        if status == 1:   # asleep
-            if status != prev_status:
-                status_timer = 0
-                if len(devices) > 0:
-                    for rect in devices:
-                        rect.config(bg='green3')
-            sleep_wake_time_txt = "Network Sleep in " + str(utils.bytes_to_int(gateway.get_parameter(PARAM_OW)) / 1000 - status_timer) + " sec"
-        else:
-            if status != prev_status:
-                status_timer = 0
-                if len(devices) > 0:
-                    for rect in devices:
-                        rect.config(bg='red3')
-            sleep_wake_time_txt = "Network Awake in " + str(utils.bytes_to_int(gateway.get_parameter(PARAM_OS)) * 10 / 1000 - status_timer) + " sec"
+        try:
+            ss = utils.bytes_to_int(gateway.get_parameter("SS"))
+            sleep_status = bitconv(ss)
+            print(sleep_status)
 
-        sleep_wake_label.configure(text=sleep_wake_time_txt)
-        prev_status = status
+            status = sleep_status[len(sleep_status) - 1]
+            pending_changes = sleep_status[len(sleep_status) - 5]
+            print(status)
 
-        txt = "Network Sleeping Time: " + str(utils.bytes_to_int(gateway.get_parameter(PARAM_OS)) * 10 / 1000) + " sec"
-        sleep_label.configure(text=txt)
-        txt = "Network Awaking Time: " + str(utils.bytes_to_int(gateway.get_parameter(PARAM_OW)) / 1000) + " sec"
-        awake_label.configure(text=txt)
+            # check if network is asleep or awake
+            if status == 1:   # asleep
+                if status != prev_status:
+                    status_timer = 0
+                    if len(devices) > 0:
+                        for rect in devices:
+                            rect.config(bg=AWAKE_DEVICE_COLOR)
+                sleep_wake_time_txt = "Network Sleep in " + str(AT - status_timer) + " sec"
+            else:
+                if status != prev_status:
+                    status_timer = 0
+                    if len(devices) > 0:
+                        for rect in devices:
+                            rect.config(bg=ASLEEP_DEVICE_COLOR)
+                sleep_wake_time_txt = "Network Awake in " + str(ST - status_timer) + " sec"
+
+            sleep_wake_label.configure(text=sleep_wake_time_txt)
+            prev_status = status
+
+            txt = "Network Sleeping Time: " + str(ST) + " sec"
+            if previously_changed == 1 or previously_changed == 3:
+                txt = txt + " (*)"
+            sleep_label.configure(text=txt)
+            txt = "Network Awaking Time: " + str(AT) + " sec"
+            if previously_changed == 2 or previously_changed == 3:
+                txt = txt + " (*)"
+            awake_label.configure(text=txt)
+
+            if not pending_changes:
+                previously_changed = 0
+
+            OS_time = ST
+            OW_time = AT
+        except TimeoutException:
+            print("Couldn't retrieve Sleep Status right now.")
 
         self.master.after(1000, self.update_time)
 
@@ -103,74 +149,69 @@ class Application(Frame):
         global node_list, node_frame, sleep_label, sleep_entry, awake_label, awake_entry, sleep_wake_label
 
         # Divide the root window vertically
-        m1 = PanedWindow(width=500, height=500, orient=VERTICAL)
+        m1 = PanedWindow(width=500, height=500, orient=VERTICAL, bg=BACKGROUND_COLOR)
         m1.pack(fill=BOTH, expand=1)
 
-        f0 = Frame(m1, bd=20)
+        f0 = Frame(m1, bd=20, bg=BACKGROUND_COLOR)
         m1.add(f0)
 
         # Label for the gateway id and port
         gateway_text = "Gateway: " + GATEWAY + " (Port: " + PORT + ")"
-        gateway_label = Label(f0, text=gateway_text, fg='black', font=("Helvetica", 16, "underline"))
+        gateway_label = Label(f0, text=gateway_text, fg='black', font=("Verdana", 16, "underline"), bg=BACKGROUND_COLOR)
         gateway_label.pack(side=LEFT, fill=BOTH)
 
-        sleep_wake_label = Label(f0, fg='black', font=("Helvetica", 16, "bold"))
+        sleep_wake_label = Label(f0, fg='black', font=("Verdana", 16, "bold"), bg=BACKGROUND_COLOR)
         sleep_wake_label.pack(side=RIGHT, fill=BOTH)
 
-        f1 = Frame(m1, bd=10)
+        f1 = Frame(m1, bd=10, bg=BACKGROUND_COLOR)
         m1.add(f1)
 
-        # txt = "Network Sleeping Time: " + str(utils.bytes_to_int(gateway.get_parameter("OS")) * 10 / 1000) + " sec"
-        sleep_label = Label(f1, fg='black', font=("Helvetica", 16, "underline"))
+        sleep_label = Label(f1, fg='black', font=("Verdana", 16, "underline"), bg=BACKGROUND_COLOR)
         sleep_label.pack(side=LEFT, fill=Y)
 
-        f11 = Frame(f1)
+        f11 = Frame(f1, bg=BACKGROUND_COLOR)
         f11.pack(side=RIGHT, fill=BOTH)
 
-        sleep_entry = Entry(f11, bd=2)
+        sleep_entry = Entry(f11, bd=2, bg=SCROLLBARS_COLOR)
         sleep_entry.pack(side=LEFT, fill=BOTH)
 
-        update_sleep_period_button = Button(f11, text="Update Sleep Time", command=update_sleep_time)
+        update_sleep_period_button = Button(f11, text="Update Sleep Time", font="Verdana", command=update_sleep_time, bg=SCROLLBARS_COLOR)
         update_sleep_period_button.pack(side=RIGHT, fill=BOTH)
 
-        f2 = Frame(m1, bd=10)
+        f2 = Frame(m1, bd=10, bg=BACKGROUND_COLOR)
         m1.add(f2)
 
-        # txt = "Network Awake Time: " + str(utils.bytes_to_int(gateway.get_parameter("OW")) / 1000) + " sec"
-        awake_label = Label(f2, fg='black', font=("Helvetica", 16, "underline"))
+        awake_label = Label(f2, fg='black', font=("Verdana", 16, "underline"), bg=BACKGROUND_COLOR)
         awake_label.pack(side=LEFT)
 
-        f22 = Frame(f2)
+        f22 = Frame(f2, bg=BACKGROUND_COLOR)
         f22.pack(side=RIGHT, fill=BOTH)
 
-        awake_entry = Entry(f22, bd=2)
+        awake_entry = Entry(f22, bd=2, bg=SCROLLBARS_COLOR)
         awake_entry.pack(side=LEFT, fill=BOTH)
 
-        update_awake_time_button = Button(f22, text="Update Wake Time", command=update_wake_time)
+        update_awake_time_button = Button(f22, text="Update Wake Time", font="Verdana", command=update_wake_time, bg=SCROLLBARS_COLOR)
         update_awake_time_button.pack(side=RIGHT, fill=BOTH)
 
         # Now divide the remainder of m1 horizontally
-        m2 = PanedWindow(m1, orient=HORIZONTAL)
+        m2 = PanedWindow(m1, orient=HORIZONTAL, bg=BACKGROUND_COLOR)
         m1.add(m2)
 
-        m3 = PanedWindow(m2, orient=VERTICAL)
+        m3 = PanedWindow(m2, orient=VERTICAL, bg=BACKGROUND_COLOR)
         m2.add(m3)
 
-        m4 = PanedWindow(m2, orient=VERTICAL)
+        m4 = PanedWindow(m2, orient=VERTICAL, bg=BACKGROUND_COLOR)
         m2.add(m4)
 
         # Create the scrollable list of nodes
-        node_list_label = Label(m3, text="Node List", fg='black', font=("Helvetica", 14, "bold"))
+        node_list_label = Label(m3, text="Node List", fg='black', font=("Verdana", 14, "bold"), width=20, bg=BACKGROUND_COLOR)
         m3.add(node_list_label)
 
-        list_frame = Frame(m3)
-        m3.add(list_frame)
+        node_list = Listbox(m3, selectbackground=NEW_DEVICE_COLOR, selectmode=SINGLE, font="Verdana", bg=NODELIST_COLOR)
+        m3.add(node_list)
 
-        node_list = Listbox(list_frame, selectbackground='gold', selectmode=SINGLE)
-        node_list.pack(side=LEFT, fill=Y)
-
-        node_list_scrollbar = Scrollbar(list_frame, orient=VERTICAL)
-        node_list_scrollbar.config(command=node_list.yview)
+        node_list_scrollbar = Scrollbar(node_list, orient=VERTICAL, command=node_list.yview, bg=SCROLLBARS_COLOR)
+        # node_list_scrollbar.config(command=node_list.yview)
         node_list_scrollbar.pack(side=RIGHT, fill=Y)
 
         node_list.config(yscrollcommand=node_list_scrollbar.set)
@@ -179,14 +220,14 @@ class Application(Frame):
             node_list.insert(END, x)
 
         # Create the scrollable pool of packets
-        node_list_label = Label(m4, text="Packet Pool", fg='black', font=("Helvetica", 14, "bold"))
+        node_list_label = Label(m4, text="Packet Pool", fg='black', font=("Verdana", 14, "bold"), bg=BACKGROUND_COLOR)
         m4.add(node_list_label)
 
-        pool_frame = Frame(m4)
+        pool_frame = Frame(m4, bg=PACKETPOOL_COLOR)
         m4.add(pool_frame)
 
         # Add a canvas to the frame
-        canvas = Canvas(pool_frame, bg='light yellow')
+        canvas = Canvas(pool_frame, bg=PACKETPOOL_COLOR)
         canvas.grid(column=0, row=0, sticky=NE + SW)
 
         # Allow the canvas (in row/column 0,0) to grow to fill the
@@ -195,7 +236,7 @@ class Application(Frame):
         pool_frame.grid_columnconfigure(0, weight=1)
 
         # Add a scrollbar that will scroll the canvas vertically
-        vscrollbar = Scrollbar(pool_frame)
+        vscrollbar = Scrollbar(pool_frame, bg=SCROLLBARS_COLOR)
         vscrollbar.grid(column=1, row=0, sticky=N+S)
 
         # Link the scrollbar to the canvas
@@ -204,7 +245,7 @@ class Application(Frame):
 
         # This frame must be defined as a child of the canvas,
         # even though we later add it as a window to the canvas
-        node_frame = Frame(canvas, bg='light yellow')
+        node_frame = Frame(canvas, bg=PACKETPOOL_COLOR)
 
         node_frame.update_idletasks()  # REQUIRED: For f.bbox() below to work!
 
@@ -226,7 +267,7 @@ class Application(Frame):
 
 
 def update_sleep_time():
-    global sleep_label, sleep_entry, sleep_time, status_timer
+    global sleep_label, sleep_entry, sleep_time, status_timer, previously_changed
 
     if len(sleep_entry.get()) > 0:
         new_sleep_time = float(sleep_entry.get())
@@ -236,14 +277,20 @@ def update_sleep_time():
 
         ms_time = int((new_sleep_time / 10) * 1000)
 
-        gateway.set_parameter(PARAM_SP, utils.hex_string_to_bytes(hex(ms_time)))
-        print(utils.bytes_to_int(gateway.get_parameter(PARAM_OS)))
+        gateway.set_parameter("SP", utils.hex_string_to_bytes(hex(ms_time)))
+
+        if previously_changed == 0:
+            previously_changed = 1
+        elif previously_changed == 2:
+            previously_changed = 3
+
+        print(utils.bytes_to_int(gateway.get_parameter("OS")))
 
         sleep_time = new_sleep_time
 
 
 def update_wake_time():
-    global awake_label, awake_entry, awake_time
+    global awake_label, awake_entry, awake_time, previously_changed
 
     if len(awake_entry.get()) > 0:
         new_awake_time = float(awake_entry.get())
@@ -251,8 +298,11 @@ def update_wake_time():
 
         ms_time = int(new_awake_time * 1000)
 
-        gateway.set_parameter(PARAM_ST, utils.hex_string_to_bytes(hex(ms_time)))
-
+        gateway.set_parameter("ST", utils.hex_string_to_bytes(hex(ms_time)))
+        if previously_changed == 0:
+            previously_changed = 2
+        elif previously_changed == 1:
+            previously_changed = 3
         awake_time = new_awake_time
 
 
@@ -283,7 +333,7 @@ def insert_devices(remote_device, data):
 
         node_list.insert(END, remote_device)
         txt = remote_device + "\n" + data
-        label = Label(node_frame, text=txt, relief=RAISED, height=5, bg='gold')
+        label = Label(node_frame, text=txt, relief=RAISED, height=5, bg=NEW_DEVICE_COLOR)
         devices.append(label)
         devices[nOfTransmitters-1].grid(padx=10, pady=10)
         devices[nOfTransmitters-1].bind("<Button-1>", functools.partial(show_data_history, index=nOfTransmitters-1))
@@ -357,9 +407,10 @@ def on_select(event):
     if prevSelectedIndex is not -1:
         devices[prevSelectedIndex].config(bg='gold')
 
-    index = int(list(selected_text)[0])
-    devices[index].config(bg='salmon2')
-    prevSelectedIndex = index
+    if selected_text != ():
+        index = int(list(selected_text)[0])
+        devices[index].config(bg=NEW_DEVICE_COLOR)
+        prevSelectedIndex = index
 
 
 # *** packages_received_callback ***
@@ -434,15 +485,18 @@ if __name__ == '__main__':
     if portfound:
         # Asks the user to enter the baudrate
         while TRUE:
+            print("Supported baudrates: " + str(baudrates))
             if input("Enter the baudrate of the device: ") not in baudrates:
                 print("Not supported baudrate. Please try again")
             else:
                 break
         root = Tk()
-        root.geometry("800x800")
+        root.geometry("1000x1000")
         root.resizable(1, 1)
         root.title("Packet Traffic Visualisation")
         root.protocol("WM_DELETE_WINDOW", ask_quit)
+        root.config(bg=BACKGROUND_COLOR)
+        root.iconbitmap(r'C:\Users\xbee.ico')
 
         gateway = XBeeDevice(PORT, BAUD_RATE)
 
@@ -456,25 +510,28 @@ if __name__ == '__main__':
         GATEWAY = "0x" + str(gateway.get_64bit_addr())
 
         # Set the ID & NI Parameter
-        gateway.set_parameter(PARAM_NODE_ID, bytearray(PARAM_VALUE_NODE_ID, 'utf8'))
-        gateway.set_parameter(PARAM_PAN_ID, PARAM_VALUE_PAN_ID)
-        gateway.set_parameter(PARAM_SM, PARAM_VALUE_SM)
-        gateway.set_parameter(PARAM_SO, PARAM_VALUE_SO)
-        gateway.set_parameter(PARAM_SP, utils.hex_string_to_bytes(hex(2000)))
-        gateway.set_parameter(PARAM_ST,utils.hex_string_to_bytes(hex(10000)))
+        gateway.set_parameter("NI", bytearray(PARAM_VALUE_NODE_ID, 'utf8'))
+        gateway.set_parameter("ID", PARAM_VALUE_PAN_ID)
+        gateway.set_parameter("SM", utils.hex_string_to_bytes(hex(7)))
+        gateway.set_parameter("SO", utils.hex_string_to_bytes(hex(1)))
+        gateway.set_parameter("SP", utils.hex_string_to_bytes(hex(2000)))
+        gateway.set_parameter("ST", utils.hex_string_to_bytes(hex(10000)))
 
-        sleep_time = utils.bytes_to_int(gateway.get_parameter(PARAM_SP)) * 10 / 1000
-        awake_time = utils.bytes_to_int(gateway.get_parameter(PARAM_ST)) / 1000
+        sleep_time = utils.bytes_to_int(gateway.get_parameter("OS")) * 10 / 1000
+        awake_time = utils.bytes_to_int(gateway.get_parameter("OW")) / 1000
 
         # Get parameters.
-        print("Node ID:\t%s" % gateway.get_parameter(PARAM_NODE_ID).decode())
-        print("Power management mode(SM):\t%s" % utils.bytes_to_int(gateway.get_parameter(PARAM_SM)))
-        print("Sleep Options(SO):\t%s" % utils.bytes_to_int(gateway.get_parameter(PARAM_SO)))
-        print("Sleep Time(SP):\t%s" % utils.bytes_to_int(gateway.get_parameter(PARAM_SP)))
-        print("Wake Time(ST):\t%s" % utils.bytes_to_int(gateway.get_parameter(PARAM_ST)))
-        print("Operating Sleep Time(OS):\t%s" % utils.bytes_to_int(gateway.get_parameter(PARAM_OS)))
-        print("Operating Wake Time(OW):\t%s" % utils.bytes_to_int(gateway.get_parameter(PARAM_OW)))
-        print("PAN ID:\t%s" % utils.hex_to_string(gateway.get_parameter(PARAM_PAN_ID)))
+        print("---------GATEWAY INFO---------")
+        print("Node ID (NI):\t%s" % gateway.get_parameter("NI").decode())
+        print("PAN ID (ID):\t%s" % utils.hex_to_string(gateway.get_parameter("ID")))
+        print("---------SLEEP PARAMETERS---------")
+        print("Sleep Mode(SM):\t%s" % utils.bytes_to_int(gateway.get_parameter("SM")))
+        print("Sleep Options(SO):\t%s" % utils.bytes_to_int(gateway.get_parameter("SO")))
+        print("Sleep Time(SP):\t%s" % utils.bytes_to_int(gateway.get_parameter("SP")))
+        print("Wake Time(ST):\t%s" % utils.bytes_to_int(gateway.get_parameter("ST")))
+        print("---------CURRENT SLEEP PARAMETERS---------")
+        print("Operating Sleep Time(OS):\t%s" % utils.bytes_to_int(gateway.get_parameter("OS")))
+        print("Operating Wake Time(OW):\t%s" % utils.bytes_to_int(gateway.get_parameter("OW")))
 
         # Assign the data received callback to the gateway
         gateway.add_data_received_callback(packages_received_callback)
